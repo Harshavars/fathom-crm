@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fathom CRM</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B3A5C">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<style>
+  :root {
+    --ink:#1B3A5C; --teal:#1F7A6C; --amber:#C97F2F; --rust:#B23A2F; --slate:#44546A;
+    --paper:#F3F6F5; --panel:#FFFFFF; --line:#D8E0DE; --text:#1D2A2E; --muted:#6E7A78;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--text); background:var(--paper); }
+  .app { min-height:100vh; }
+
+  /* Left nav rail */
+  .rail { width:210px; flex-shrink:0; background:var(--ink); color:#fff; display:flex; flex-direction:column; transition: width 0.15s ease; }
+  .rail.collapsed { width:60px; }
+  .rail-top { display:flex; align-items:center; gap:10px; padding:16px 14px; border-bottom:1px solid rgba(255,255,255,0.15); }
+  .hamburger { background:none; border:none; color:#fff; cursor:pointer; font-size:18px; padding:4px; flex-shrink:0; }
+  .rail-title { font-family:Georgia,serif; font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; }
+  .rail.collapsed .rail-title { display:none; }
+  .nav-item {
+    display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer; font-size:13.5px; font-weight:600;
+    color:rgba(255,255,255,0.75); border-left:3px solid transparent; white-space:nowrap; overflow:hidden;
+  }
+  .nav-item:hover { background:rgba(255,255,255,0.06); color:#fff; }
+  .nav-item.active { background:rgba(255,255,255,0.1); color:#fff; border-left-color:var(--teal); }
+  .nav-icon { width:18px; height:18px; flex-shrink:0; }
+  .rail.collapsed .nav-label { display:none; }
+
+  /* Main */
+  .main { flex:1; padding:26px 34px; overflow-y:auto; }
+  .page-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .page-title { font-family:Georgia,serif; font-size:20px; font-weight:700; color:var(--ink); margin:0; }
+  .back-link { font-size:13px; color:var(--teal); cursor:pointer; margin-bottom:10px; display:inline-block; }
+
+  .btn { cursor:pointer; border:none; border-radius:4px; font-family:inherit; font-size:13.5px; font-weight:600; padding:9px 14px; display:inline-flex; align-items:center; gap:7px; }
+  .btn:active { transform:scale(0.98); }
+  .btn-primary { background:var(--teal); color:#fff; }
+  .btn-dark { background:var(--ink); color:#fff; }
+  .btn-outline { background:#fff; color:var(--slate); border:1px solid var(--line); }
+  .btn-danger { background:#fff; color:var(--rust); border:1px solid var(--rust); }
+  .btn-sm { padding:6px 10px; font-size:12.5px; }
+
+  input[type="text"], input[type="date"], select, textarea {
+    font-family:inherit; font-size:13.5px; border:1px solid var(--line); border-radius:4px; padding:8px 10px;
+    background:#fff; color:var(--text); width:100%;
+  }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--teal); box-shadow:0 0 0 2px rgba(31,122,108,0.15); }
+  label.field-label { font-size:11.5px; color:var(--muted); display:block; margin-bottom:4px; }
+
+  .card { background:var(--panel); border:1px solid var(--line); padding:18px 20px; margin-bottom:16px; }
+  .card h3 { font-size:14px; margin:0 0 12px; color:var(--ink); }
+
+  /* Accounts list table */
+  table.acc-table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); }
+  table.acc-table th { text-align:left; font-size:11.5px; color:var(--muted); padding:10px 14px; border-bottom:1px solid var(--line); }
+  table.acc-table td { padding:10px 14px; border-bottom:1px solid var(--paper); font-size:13.5px; vertical-align:middle; }
+  table.acc-table tr.acc-row { cursor:pointer; }
+  table.acc-table tr.acc-row:hover { background:#EEF3F1; }
+  .tier-pill { font-size:11px; font-weight:700; padding:3px 8px; border:1px solid; display:inline-block; }
+  .progress-track { width:110px; height:8px; background:var(--paper); border-radius:4px; overflow:hidden; display:inline-block; vertical-align:middle; }
+  .progress-fill { height:100%; background:var(--teal); }
+  .progress-label { font-size:11px; color:var(--muted); margin-left:6px; }
+
+  /* Detail */
+  .detail-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:16px; }
+  .detail-name-input { font-size:20px; font-weight:700; font-family:Georgia,serif; border:none; background:transparent; padding:2px 0; color:var(--ink); width:100%; }
+  .detail-name-input:focus { outline:none; border-bottom:1px solid var(--teal); }
+  .row-flex { display:flex; gap:12px; }
+  .row-flex > div { flex:1; }
+
+  .score-summary { display:flex; align-items:center; gap:16px; }
+  .score-num { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:20px; font-weight:700; color:var(--ink); }
+
+  .stage-track { position:relative; height:6px; background:var(--paper); border-radius:3px; margin:22px 4px 10px; }
+  .stage-fill { position:absolute; top:0; left:0; height:100%; background:var(--teal); border-radius:3px; }
+  .stage-dots { display:flex; justify-content:space-between; position:relative; top:-16px; }
+  .stage-dot-wrap { display:flex; flex-direction:column; align-items:center; cursor:pointer; }
+  .stage-dot { width:14px; height:14px; border-radius:50%; background:#fff; border:2px solid var(--line); margin-bottom:4px; }
+  .stage-dot.reached { background:var(--teal); border-color:var(--teal); }
+  .stage-dot-label { font-size:10.5px; color:var(--muted); text-align:center; max-width:70px; }
+  .payment-badge { font-size:12px; font-weight:700; padding:4px 10px; display:inline-block; margin-top:6px; }
+
+  .contact-row, .meeting-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--paper); }
+  .contact-row:last-child, .meeting-row:last-child { border-bottom:none; }
+  .add-inline { display:flex; gap:8px; margin-top:10px; }
+  .add-inline input, .add-inline textarea { flex:1; }
+  .last-meeting-card { background:var(--paper); padding:10px 14px; border-radius:4px; margin-bottom:12px; }
+  .del-x { background:none; border:none; color:var(--muted); cursor:pointer; font-size:13px; }
+  .del-x:hover { color:var(--rust); }
+
+  /* Scoring form */
+  .criterion { margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--paper); }
+  .criterion:last-child { margin-bottom:0; padding-bottom:0; border-bottom:none; }
+  .criterion-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:4px; }
+  .criterion-label { font-size:13.5px; font-weight:600; color:var(--ink); }
+  .criterion-hint { font-size:12px; color:var(--muted); font-weight:400; }
+  .criterion-weight { font-size:10.5px; color:var(--muted); font-family:"SF Mono",Menlo,Consolas,monospace; }
+  .score-buttons { display:flex; gap:6px; margin:8px 0 6px; }
+  .score-btn { width:32px; height:32px; border:1px solid var(--line); background:#fff; color:var(--text); font-size:13px; font-weight:600; font-family:"SF Mono",Menlo,Consolas,monospace; cursor:pointer; border-radius:4px; }
+  .score-btn.active { background:var(--teal); border-color:var(--teal); color:#fff; }
+  .criterion-anchor { font-size:11.5px; color:var(--muted); font-style:italic; line-height:1.4; }
+  .result-panel { background:var(--panel); border:1px solid var(--line); border-left-width:4px; padding:16px 20px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; }
+  .result-tier { font-size:14px; font-weight:700; padding:5px 12px; border:1px solid; display:inline-block; }
+
+  /* Stats */
+  .stat-cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr)); gap:12px; margin-bottom:20px; }
+  .stat-card { background:var(--panel); border:1px solid var(--line); padding:14px 16px; }
+  .stat-card .num { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:24px; font-weight:700; color:var(--ink); }
+  .stat-card .lbl { font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .chart-wrap { background:var(--panel); border:1px solid var(--line); padding:18px 20px; height:280px; }
+
+  /* Confirm modal */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(20,30,35,0.5); display:none;
+    align-items:center; justify-content:center; z-index:200;
+  }
+  .modal-overlay.visible { display:flex; }
+  .modal-card { background:var(--panel); border-radius:6px; padding:22px 24px; max-width:320px; width:90%; }
+  .modal-msg { font-size:14px; color:var(--text); line-height:1.5; margin:0 0 18px; }
+  .modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+
+  /* Splash */
+  .splash {
+    position:fixed; inset:0; background:var(--ink); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; z-index:100; color:#fff;
+  }
+  .splash-mark { width:180px; height:auto; margin-bottom:14px; }
+  .splash-word { font-family:Georgia,"Times New Roman",serif; font-size:38px; font-weight:700; letter-spacing:0.5px; margin:0; }
+  .splash-sub { font-size:13px; letter-spacing:2px; color:rgba(255,255,255,0.65); margin:2px 0 28px; }
+  .splash-pass { width:220px; padding:9px 12px; border-radius:4px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.08); color:#fff; font-size:14px; text-align:center; margin-bottom:10px; }
+  .splash-name { width:220px; padding:9px 12px; border-radius:4px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.08); color:#fff; font-size:14px; text-align:center; margin-bottom:10px; }
+  /* Higher-specificity guard: the app-wide input[type="text"] rule elsewhere on the page
+     (width:100%, white background) otherwise wins the cascade over the two classes above. */
+  .splash input.splash-name, .splash input.splash-pass {
+    width:220px; background:rgba(255,255,255,0.08); color:#fff;
+    text-align:center; border:1px solid rgba(255,255,255,0.3);
+  }
+  .splash input.splash-name::placeholder, .splash input.splash-pass::placeholder { color:rgba(255,255,255,0.5); }
+  .splash-err { font-size:12.5px; color:#F0A8A8; min-height:18px; margin-bottom:4px; }
+  .splash-enter { background:var(--teal); color:#fff; border:none; border-radius:4px; font-size:14px; font-weight:600; padding:11px 26px; cursor:pointer; }
+  .splash-enter:active { transform:scale(0.98); }
+  .app { display:none; }
+  .app.visible { display:flex; }
+  /* Home dashboard */
+  .home-greeting { font-family:Georgia,serif; font-size:26px; font-weight:700; color:var(--ink); margin:0 0 6px; }
+  .home-sub { font-size:14px; color:var(--muted); margin:0 0 22px; }
+  .checklist-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); gap:12px; margin-top:8px; }
+  .checklist-card {
+    background:var(--panel); border:1px solid var(--line); padding:16px; cursor:pointer;
+    display:flex; align-items:flex-start; gap:12px; transition: border-color 0.12s ease;
+  }
+  .checklist-card:hover { border-color:var(--teal); }
+  .checklist-card.done { background:#EEF6F3; }
+  .checklist-icon {
+    width:34px; height:34px; border-radius:50%; background:var(--paper); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; color:var(--ink);
+  }
+  .checklist-card.done .checklist-icon { background:var(--teal); color:#fff; }
+  .checklist-title { font-size:13.5px; font-weight:600; color:var(--ink); margin-bottom:2px; }
+  .checklist-desc { font-size:12px; color:var(--muted); line-height:1.4; }
+</style>
+</head>
+<body>
+
+<div class="splash" id="splash">
+  <img class="splash-mark" src="fathom-logo.png" alt="Fathom Science" />
+  <p class="splash-sub">C R M</p>
+  <input type="text" class="splash-name" id="nameInputSplash" placeholder="Your name" autocomplete="off" />
+  <input type="password" class="splash-pass" id="passInput" placeholder="Enter passphrase" autocomplete="off" />
+  <div class="splash-err" id="passErr"></div>
+  <button class="splash-enter" id="enterBtn">Enter CRM</button>
+</div>
+
+<div class="app" id="appRoot">
+  <div class="rail" id="rail">
+    <div class="rail-top">
+      <button class="hamburger" id="hamburgerBtn">&#9776;</button>
+      <img src="icon-192.png" alt="" style="width:22px; height:22px; border-radius:3px; flex-shrink:0;" />
+      <span class="rail-title">Fathom CRM</span>
+    </div>
+    <div class="nav-item" data-view="home">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>
+      <span class="nav-label">Home</span>
+    </div>
+    <div class="nav-item" data-view="accounts">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="1"/><path d="M3 7l2-4h14l2 4"/><path d="M9 20v-6h6v6"/></svg>
+      <span class="nav-label">Accounts</span>
+    </div>
+    <div class="nav-item" data-view="scoring">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.5"/></svg>
+      <span class="nav-label">Scoring</span>
+    </div>
+    <div class="nav-item" data-view="stats">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/></svg>
+      <span class="nav-label">Stats</span>
+    </div>
+  </div>
+
+  <div class="main" id="main"></div>
+</div>
+
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-card">
+    <p class="modal-msg" id="confirmMsg"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" id="confirmNoBtn">No, go back</button>
+      <button class="btn btn-danger btn-sm" id="confirmYesBtn">Yes, delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- Model ----------
+const CRITERIA = [
+  { key:"pain", label:"Operational pain", hint:"(does weather uncertainty affect safety, cost, or schedule?)", weight:1.5, anchors:[
+    "Weather is a minor inconvenience; no real safety/cost impact",
+    "Occasional minor disruption, rarely affects operations",
+    "Weather causes periodic delays or added cost, but they've adapted",
+    "Weather meaningfully affects schedule, safety, or cost on a regular basis",
+    "Weather uncertainty directly threatens safety, causes recurring costly delays, or blocks a mission-critical decision"]},
+  { key:"access", label:"Access", hint:"(do we have a relationship or partner path into this account?)", weight:1.5, anchors:[
+    "No relationship, no partner route, cold outreach only",
+    "Only very indirect contact possible",
+    "A partner (Esri/Wärtsilä/Anduril) has some presence, but no warm intro yet",
+    "A partial warm path exists (secondary contact, event connection)",
+    "Direct relationship, warm intro, or an active partner already in the account"]},
+  { key:"productFit", label:"Product fit", hint:"(can an existing Fathom product solve this now?)", weight:1.0, anchors:[
+    "Would need major custom development to solve this",
+    "Existing products cover only a small piece of the need",
+    "An existing product partially fits with some adaptation",
+    "An existing product fits well with minor tailoring",
+    "An existing product (ARMS/API/HazCast) fits almost out of the box"]},
+  { key:"pilotFeasibility", label:"Pilot feasibility", hint:"(can a 60-90 day pilot prove value here?)", weight:1.0, anchors:[
+    "Would take 6+ months and heavy integration to prove value",
+    "Feasible only with significant integration effort",
+    "Feasible in 60-90 days with moderate effort",
+    "Feasible in 60-90 days with light effort",
+    "Feasible in 60-90 days with minimal integration"]},
+  { key:"urgency", label:"Urgency", hint:"(is there a current trigger \u2014 RFP, disruption, deadline?)", weight:1.0, anchors:[
+    "No near-term trigger \u2014 this is a 'someday' conversation",
+    "Mild interest but no forcing event",
+    "Some relevant activity (planning cycle, general modernization push)",
+    "A near-term event is approaching (upcoming planning cycle, budget window)",
+    "A live trigger right now \u2014 an RFP, a disruption, an exercise, a regulatory deadline"]},
+  { key:"abilityToPay", label:"Ability to pay", hint:"(is there budget or a funded pilot route?)", weight:0.75, anchors:[
+    "No identifiable budget, no funded program in sight",
+    "Budget seems unlikely without new approval",
+    "Budget is plausible but unconfirmed",
+    "Budget likely exists, some confirmation available",
+    "Confirmed budget line, active RFP, or a funded pilot vehicle exists"]},
+  { key:"scalePotential", label:"Scale potential", hint:"(could a successful pilot expand to more sites or programs?)", weight:0.75, anchors:[
+    "One-off, no path to expand",
+    "Limited expansion possible, but unclear",
+    "Could expand to a few more sites/vessels",
+    "Clear path to expand within the organization",
+    "Could expand across a fleet, multiple ports, or a whole program"]}
+];
+const MAX_RAW = CRITERIA.reduce((s,c)=>s+c.weight*5,0);
+const DOMAINS = ["Ports & Shipping","Offshore Energy","Marine Resilience","Emergency Response"];
+const TIER = {
+  PURSUE:{key:"PURSUE",label:"Pursue now",color:"#1F7A6C"},
+  NURTURE:{key:"NURTURE",label:"Nurture",color:"#C97F2F"},
+  SKIP:{key:"SKIP",label:"Not worth it",color:"#B23A2F"}
+};
+const STAGES = [
+  {value:10, label:"Identified"},
+  {value:20, label:"Call held"},
+  {value:50, label:"Pilot proposed"},
+  {value:80, label:"Pilot agreed"},
+  {value:100, label:"Payment received"}
+];
+
+function scoreOf(scores){
+  let raw=0;
+  CRITERIA.forEach(c=>{ raw += (scores[c.key]||0)*c.weight; });
+  const pct = (raw/MAX_RAW)*100;
+  let tier = TIER.NURTURE;
+  if ((scores.pain||0)<=1 || (scores.access||0)<=1) tier = TIER.SKIP;
+  else if (pct>=75) tier = TIER.PURSUE;
+  else if (pct<55) tier = TIER.SKIP;
+  return {raw, pct, tier};
+}
+function emptyScores(){ const s={}; CRITERIA.forEach(c=>s[c.key]=3); return s; }
+function emptyAccount(){
+  return { id:null, name:"", domain:DOMAINS[0], scores:emptyScores(), stage:10,
+    notes:"", contacts:[], meetings:[], owner:"", nextAction:"", createdAt:new Date().toISOString() };
+}
+function uid(prefix){ return prefix+"-"+Date.now()+"-"+Math.floor(Math.random()*10000); }
+
+// ---------- Storage (with migration from earlier single-list version) ----------
+const KEY = "fathomCrmAccounts";
+const OLD_KEY = "soundingBoardLeads";
+function loadAccounts(){
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return JSON.parse(raw);
+    const old = localStorage.getItem(OLD_KEY);
+    if (old) {
+      const oldLeads = JSON.parse(old);
+      const migrated = oldLeads.map(l => ({
+        id:l.id, name:l.name, domain:l.domain, scores:l.scores, stage:10,
+        notes:l.notes||"", contacts:[], meetings:[], owner:l.owner||"", nextAction:l.nextAction||"",
+        createdAt:new Date().toISOString()
+      }));
+      saveAccounts(migrated);
+      return migrated;
+    }
+    return [];
+  } catch(e){ return []; }
+}
+function saveAccounts(list){
+  try { localStorage.setItem(KEY, JSON.stringify(list)); return true; } catch(e){ return false; }
+}
+
+// ---------- State ----------
+let accounts = loadAccounts();
+let view = "home";
+let selectedId = null;
+let scoringForm = emptyAccount();
+let chartInstance = null;
+
+function findAccount(id){ return accounts.find(a=>a.id===id); }
+function upsertAccount(acc){
+  const idx = accounts.findIndex(a=>a.id===acc.id);
+  if (idx>=0) accounts[idx]=acc; else accounts.push(acc);
+  saveAccounts(accounts);
+}
+function deleteAccount(id){
+  accounts = accounts.filter(a=>a.id!==id);
+  saveAccounts(accounts);
+}
+
+// ---------- Nav ----------
+document.getElementById("hamburgerBtn").addEventListener("click", ()=>{
+  document.getElementById("rail").classList.toggle("collapsed");
+});
+document.querySelectorAll(".nav-item").forEach(el=>{
+  el.addEventListener("click", ()=>{
+    view = el.dataset.view;
+    if (view==="accounts") selectedId = null;
+    renderAll();
+  });
+});
+function goTo(v){ view = v; if (v==="accounts") selectedId=null; renderAll(); }
+function renderNav(){
+  document.querySelectorAll(".nav-item").forEach(el=>{
+    el.classList.toggle("active", el.dataset.view===view);
+  });
+}
+
+// ---------- Render dispatch ----------
+function renderAll(){
+  renderNav();
+  const main = document.getElementById("main");
+  if (view==="home") main.innerHTML = homeHtml();
+  else if (view==="accounts" && !selectedId) main.innerHTML = accountsListHtml();
+  else if (view==="accounts" && selectedId) main.innerHTML = accountDetailHtml(findAccount(selectedId));
+  else if (view==="scoring") main.innerHTML = scoringHtml();
+  else if (view==="stats") main.innerHTML = statsHtml();
+  attachHandlers();
+  if (view==="stats") drawChart();
+}
+
+// ---------- Home ----------
+function getUserName(){
+  try { return localStorage.getItem("fathomCrmUserName") || ""; } catch(e){ return ""; }
+}
+function homeHtml(){
+  const name = getUserName();
+  const pursueCount = accounts.filter(a=> scoreOf(a.scores).tier.key==="PURSUE").length;
+  const now = new Date();
+  const thisMonthKey = now.getFullYear()+"-"+now.getMonth();
+  const newThisMonth = accounts.filter(a=>{
+    const d = new Date(a.createdAt);
+    return (d.getFullYear()+"-"+d.getMonth())===thisMonthKey;
+  }).length;
+
+  const hasScored = accounts.length > 0;
+  const hasContact = accounts.some(a=>a.contacts.length>0);
+  const hasAdvanced = accounts.some(a=>a.stage>=50);
+
+  return `
+    <p class="home-greeting">${name ? "Hello, "+esc(name) : "Hello"} \u{1F44B}</p>
+    <p class="home-sub">Here's where the Fathom account pipeline stands.</p>
+
+    <div class="stat-cards">
+      <div class="stat-card"><div class="num">${accounts.length}</div><div class="lbl">Total accounts</div></div>
+      <div class="stat-card"><div class="num">${pursueCount}</div><div class="lbl">Pursue now</div></div>
+      <div class="stat-card"><div class="num">${newThisMonth}</div><div class="lbl">New this month</div></div>
+    </div>
+
+    <h3 style="font-size:14px; color:var(--ink); margin:22px 0 10px;">Get things moving</h3>
+    <div class="checklist-grid">
+      <div class="checklist-card ${hasScored?'done':''}" data-goto="scoring">
+        <div class="checklist-icon">${hasScored?'&#10003;':'1'}</div>
+        <div><div class="checklist-title">Score your first lead</div><div class="checklist-desc">Run a prospect through the ICP scorecard.</div></div>
+      </div>
+      <div class="checklist-card ${hasContact?'done':''}" data-goto="accounts">
+        <div class="checklist-icon">${hasContact?'&#10003;':'2'}</div>
+        <div><div class="checklist-title">Add a contact</div><div class="checklist-desc">Log a buyer or influencer on an account.</div></div>
+      </div>
+      <div class="checklist-card ${hasAdvanced?'done':''}" data-goto="accounts">
+        <div class="checklist-icon">${hasAdvanced?'&#10003;':'3'}</div>
+        <div><div class="checklist-title">Advance a deal</div><div class="checklist-desc">Move an account past the 50% pilot-proposed stage.</div></div>
+      </div>
+      <div class="checklist-card" data-action="export">
+        <div class="checklist-icon">&#8681;</div>
+        <div><div class="checklist-title">Export your pipeline</div><div class="checklist-desc">Download every account as an Excel file.</div></div>
+      </div>
+      <div class="checklist-card" data-action="invite">
+        <div class="checklist-icon">&#128101;</div>
+        <div><div class="checklist-title">Share access with your team</div><div class="checklist-desc">Send the link and passphrase privately to Roy, Taylor, Michael, and your teammates.</div></div>
+      </div>
+    </div>
+  `;
+}
+
+// ---------- Accounts list ----------
+function accountsListHtml(){
+  const rows = accounts.map(a=>{
+    const s = scoreOf(a.scores);
+    const stageLabel = STAGES.find(st=>st.value===a.stage).label;
+    return `<tr class="acc-row" data-id="${a.id}">
+      <td>${esc(a.name)}</td>
+      <td>${esc(a.domain)}</td>
+      <td><span class="tier-pill" style="color:${s.tier.color};border-color:${s.tier.color}">${s.tier.label}</span></td>
+      <td>
+        <span class="progress-track"><span class="progress-fill" style="width:${a.stage}%"></span></span>
+        <span class="progress-label">${a.stage}% \u2014 ${stageLabel}</span>
+      </td>
+      <td>${esc(a.owner||"\u2014")}</td>
+      <td><button class="del-x" data-del="${a.id}" title="Delete account">&#10005;</button></td>
+    </tr>`;
+  }).join("");
+  return `
+    <div class="page-head">
+      <h2 class="page-title">Accounts</h2>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-outline" id="downloadBtn">Download all as Excel</button>
+        <button class="btn btn-primary" id="newAccountBtn">+ New account</button>
+      </div>
+    </div>
+    <table class="acc-table">
+      <tr><th>Company</th><th>Domain</th><th>ICP tier</th><th>Progress</th><th>Owner</th><th></th></tr>
+      ${rows || `<tr><td colspan="6" style="color:var(--muted); font-style:italic; padding:16px;">No accounts yet \u2014 score your first lead to add one.</td></tr>`}
+    </table>
+  `;
+}
+
+// ---------- Account detail ----------
+function accountDetailHtml(a){
+  if (!a) { selectedId=null; return accountsListHtml(); }
+  const s = scoreOf(a.scores);
+  const lastMeeting = [...a.meetings].sort((x,y)=> new Date(y.date)-new Date(x.date))[0];
+  const meetingsSorted = [...a.meetings].sort((x,y)=> new Date(y.date)-new Date(x.date));
+  return `
+    <div class="back-link" id="backToList">&larr; All accounts</div>
+    <div class="detail-head">
+      <div style="flex:1;">
+        <input type="text" class="detail-name-input" id="accName" value="${escAttr(a.name)}" />
+        <div class="row-flex" style="margin-top:10px; max-width:420px;">
+          <div>
+            <label class="field-label">Domain</label>
+            <select id="accDomain">${DOMAINS.map(d=>`<option value="${d}" ${d===a.domain?"selected":""}>${d}</option>`).join("")}</select>
+          </div>
+          <div>
+            <label class="field-label">Owner</label>
+            <input type="text" id="accOwner" value="${escAttr(a.owner)}" placeholder="e.g. Harsha" />
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-sm" id="deleteAccBtn">Delete account</button>
+    </div>
+
+    <div class="card">
+      <h3>ICP score</h3>
+      <div class="score-summary">
+        <span class="score-num">${s.raw.toFixed(1)} / ${MAX_RAW.toFixed(1)}</span>
+        <span class="tier-pill" style="color:${s.tier.color};border-color:${s.tier.color}">${s.tier.label}</span>
+        <span style="color:var(--muted); font-size:12.5px;">${Math.round(s.pct)}% of max</span>
+        <button class="btn btn-outline btn-sm" id="rescoreBtn" style="margin-left:auto;">Rescore</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Pipeline progress</h3>
+      <div class="stage-track">
+        <span class="stage-fill" style="width:${a.stage}%"></span>
+      </div>
+      <div class="stage-dots">
+        ${STAGES.map(st=>`
+          <div class="stage-dot-wrap" data-stage="${st.value}">
+            <div class="stage-dot ${a.stage>=st.value?'reached':''}"></div>
+            <div class="stage-dot-label">${st.value}%<br/>${st.label}</div>
+          </div>`).join("")}
+      </div>
+      ${a.stage===100 ? `<div class="payment-badge" style="color:${TIER.PURSUE.color}; border:1px solid ${TIER.PURSUE.color};">Payment received</div>`
+                       : `<div class="payment-badge" style="color:var(--muted); border:1px solid var(--line);">Payment not yet received</div>`}
+    </div>
+
+    <div class="card">
+      <h3>Contacts</h3>
+      <div id="contactsList">
+        ${a.contacts.length===0 ? `<div style="color:var(--muted); font-size:13px; font-style:italic;">No contacts added yet.</div>` : ""}
+        ${a.contacts.map(c=>`
+          <div class="contact-row">
+            <div><strong>${esc(c.name)}</strong> <span style="color:var(--muted); font-size:12.5px;">\u2014 ${esc(c.role)}</span></div>
+            <button class="del-x" data-del-contact="${c.id}">&#10005;</button>
+          </div>`).join("")}
+      </div>
+      <div class="add-inline">
+        <input type="text" id="newContactName" placeholder="Contact name" />
+        <input type="text" id="newContactRole" placeholder="Role (e.g. Harbor Master)" />
+        <button class="btn btn-outline btn-sm" id="addContactBtn">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Meetings</h3>
+      ${lastMeeting ? `<div class="last-meeting-card"><strong>Last meeting:</strong> ${fmtDate(lastMeeting.date)} \u2014 ${esc(lastMeeting.notes)}</div>` : `<div style="color:var(--muted); font-size:13px; font-style:italic; margin-bottom:10px;">No meetings logged yet.</div>`}
+      <div id="meetingsList">
+        ${meetingsSorted.slice(1).map(m=>`
+          <div class="meeting-row">
+            <div style="font-size:13px;"><strong>${fmtDate(m.date)}</strong> \u2014 ${esc(m.notes)}</div>
+            <button class="del-x" data-del-meeting="${m.id}">&#10005;</button>
+          </div>`).join("")}
+      </div>
+      <div class="add-inline">
+        <input type="date" id="newMeetingDate" value="${todayStr()}" style="max-width:160px;" />
+        <input type="text" id="newMeetingNotes" placeholder="What happened / next step..." />
+        <button class="btn btn-outline btn-sm" id="addMeetingBtn">Log meeting</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Notes</h3>
+      <textarea id="accNotes" rows="4" placeholder="General account notes...">${a.notes}</textarea>
+    </div>
+
+    <div class="card">
+      <h3>Next action</h3>
+      <input type="text" id="accNextAction" value="${escAttr(a.nextAction)}" placeholder="e.g. Send pilot proposal" />
+    </div>
+  `;
+}
+
+// ---------- Scoring ----------
+function scoringHtml(){
+  const f = scoringForm;
+  return `
+    <div class="page-head"><h2 class="page-title">${f.id ? "Rescore account" : "Score a new lead"}</h2></div>
+    <div class="row-flex" style="margin-bottom:18px;">
+      <div>
+        <label class="field-label">Company / account name</label>
+        <input type="text" id="scName" value="${escAttr(f.name)}" placeholder="e.g. Port of Portland" />
+      </div>
+      <div>
+        <label class="field-label">Domain</label>
+        <select id="scDomain">${DOMAINS.map(d=>`<option value="${d}" ${d===f.domain?"selected":""}>${d}</option>`).join("")}</select>
+      </div>
+    </div>
+    <div class="card" id="criteriaPanel">
+      ${CRITERIA.map(c=>`
+        <div class="criterion">
+          <div class="criterion-head">
+            <span class="criterion-label">${c.label} <span class="criterion-hint">${c.hint}</span></span>
+            <span class="criterion-weight">weight ${c.weight}x</span>
+          </div>
+          <div class="score-buttons" data-key="${c.key}">
+            ${[1,2,3,4,5].map(n=>`<button type="button" class="score-btn ${f.scores[c.key]===n?'active':''}" data-key="${c.key}" data-val="${n}">${n}</button>`).join("")}
+          </div>
+          <div class="criterion-anchor">${c.anchors[f.scores[c.key]-1]}</div>
+        </div>
+      `).join("")}
+    </div>
+    ${resultPanelHtml(f.scores)}
+    <div id="scoreErr" style="display:none; color:var(--rust); font-size:12.5px; margin-bottom:12px;"></div>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-dark" id="saveScoreBtn">${f.id ? "Update account" : "Save as new account"}</button>
+      <button class="btn btn-outline" id="clearScoreBtn">Clear</button>
+    </div>
+  `;
+}
+function resultPanelHtml(scores){
+  const r = scoreOf(scores);
+  return `
+    <div class="result-panel" style="border-left-color:${r.tier.color};">
+      <div>
+        <div style="font-size:11px; color:var(--muted);">Weighted score</div>
+        <div class="score-num">${r.raw.toFixed(1)} <span style="font-size:14px; color:var(--muted); font-weight:400;">/ ${MAX_RAW.toFixed(1)}</span></div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px; color:var(--muted);">${Math.round(r.pct)}% of max</div>
+        <div class="result-tier" style="color:${r.tier.color}; border-color:${r.tier.color};">${r.tier.label}</div>
+      </div>
+    </div>
+  `;
+}
+
+// ---------- Stats ----------
+function statsHtml(){
+  const now = new Date();
+  const thisMonthKey = now.getFullYear()+"-"+now.getMonth();
+  const newThisMonth = accounts.filter(a=> {
+    const d = new Date(a.createdAt);
+    return (d.getFullYear()+"-"+d.getMonth())===thisMonthKey;
+  }).length;
+  const stageCounts = {};
+  STAGES.forEach(st=> stageCounts[st.value] = accounts.filter(a=>a.stage===st.value).length);
+
+  return `
+    <div class="page-head"><h2 class="page-title">Stats</h2></div>
+    <div class="stat-cards">
+      <div class="stat-card"><div class="num">${accounts.length}</div><div class="lbl">Total accounts</div></div>
+      <div class="stat-card"><div class="num">${newThisMonth}</div><div class="lbl">New leads this month</div></div>
+      ${STAGES.map(st=>`<div class="stat-card"><div class="num">${stageCounts[st.value]}</div><div class="lbl">${st.value}% \u2014 ${st.label}</div></div>`).join("")}
+    </div>
+    <div class="chart-wrap"><canvas id="growthChart"></canvas></div>
+  `;
+}
+function drawChart(){
+  const canvas = document.getElementById("growthChart");
+  if (!canvas || typeof Chart === "undefined") return;
+  const months = [];
+  const now = new Date();
+  for (let i=5; i>=0; i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push({ key:d.getFullYear()+"-"+d.getMonth(), label:d.toLocaleString('default',{month:'short', year:'2-digit'}) });
+  }
+  const counts = months.map(m => accounts.filter(a=>{
+    const d = new Date(a.createdAt);
+    return (d.getFullYear()+"-"+d.getMonth())===m.key;
+  }).length);
+
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(canvas.getContext("2d"), {
+    type:"bar",
+    data:{ labels:months.map(m=>m.label), datasets:[{ label:"New leads", data:counts, backgroundColor:"#1F7A6C" }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } }
+  });
+}
+
+// ---------- Confirm modal ----------
+function showConfirm(message, onYes) {
+  document.getElementById("confirmMsg").textContent = message;
+  const overlay = document.getElementById("confirmModal");
+  overlay.classList.add("visible");
+  const yesBtn = document.getElementById("confirmYesBtn");
+  const noBtn = document.getElementById("confirmNoBtn");
+  function cleanup() {
+    overlay.classList.remove("visible");
+    yesBtn.removeEventListener("click", onYesClick);
+    noBtn.removeEventListener("click", onNoClick);
+  }
+  function onYesClick() { cleanup(); onYes(); }
+  function onNoClick() { cleanup(); }
+  yesBtn.addEventListener("click", onYesClick);
+  noBtn.addEventListener("click", onNoClick);
+}
+
+// ---------- Handlers ----------
+function attachHandlers(){
+  // Home
+  document.querySelectorAll(".checklist-card").forEach(card=>{
+    card.addEventListener("click", ()=>{
+      if (card.dataset.goto) { goTo(card.dataset.goto); }
+      else if (card.dataset.action === "export") { downloadExcel(); }
+      else if (card.dataset.action === "invite") { goTo("home"); alert("Share this page's link and your team passphrase privately (text or Slack DM) with the people you want to invite \u2014 not anywhere public."); }
+    });
+  });
+
+  // Accounts list
+  const newAccBtn = document.getElementById("newAccountBtn");
+  if (newAccBtn) newAccBtn.addEventListener("click", ()=>{ scoringForm = emptyAccount(); view="scoring"; renderAll(); });
+  const dlBtn = document.getElementById("downloadBtn");
+  if (dlBtn) dlBtn.addEventListener("click", downloadExcel);
+  document.querySelectorAll(".acc-row").forEach(row=>{
+    row.addEventListener("click",(e)=>{
+      if (e.target.closest("[data-del]")) return;
+      selectedId = row.dataset.id; renderAll();
+    });
+  });
+  document.querySelectorAll("[data-del]").forEach(btn=>{
+    btn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      const acc = findAccount(btn.dataset.del);
+      showConfirm(`Delete ${acc ? acc.name : "this account"}? This can't be undone.`, ()=>{
+        deleteAccount(btn.dataset.del); renderAll();
+      });
+    });
+  });
+
+  // Account detail
+  const backLink = document.getElementById("backToList");
+  if (backLink) backLink.addEventListener("click", ()=>{ selectedId=null; renderAll(); });
+  const delAccBtn = document.getElementById("deleteAccBtn");
+  if (delAccBtn) delAccBtn.addEventListener("click", ()=>{
+    const a = findAccount(selectedId);
+    showConfirm(`Delete ${a ? a.name : "this account"}? This can't be undone.`, ()=>{
+      deleteAccount(selectedId); selectedId=null; renderAll();
+    });
+  });
+  const rescoreBtn = document.getElementById("rescoreBtn");
+  if (rescoreBtn) rescoreBtn.addEventListener("click", ()=>{
+    const a = findAccount(selectedId);
+    scoringForm = { ...a, scores:{...a.scores} };
+    view="scoring"; renderAll();
+  });
+  bindAccField("accName","name");
+  bindAccField("accDomain","domain");
+  bindAccField("accOwner","owner");
+  bindAccField("accNotes","notes");
+  bindAccField("accNextAction","nextAction");
+  document.querySelectorAll(".stage-dot-wrap").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const a = findAccount(selectedId);
+      a.stage = parseInt(el.dataset.stage,10);
+      upsertAccount(a); renderAll();
+    });
+  });
+  const addContactBtn = document.getElementById("addContactBtn");
+  if (addContactBtn) addContactBtn.addEventListener("click", ()=>{
+    const name = document.getElementById("newContactName").value.trim();
+    const role = document.getElementById("newContactRole").value.trim();
+    if (!name) return;
+    const a = findAccount(selectedId);
+    a.contacts.push({ id:uid("contact"), name, role });
+    upsertAccount(a); renderAll();
+  });
+  document.querySelectorAll("[data-del-contact]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const a = findAccount(selectedId);
+      a.contacts = a.contacts.filter(c=>c.id!==btn.dataset.delContact);
+      upsertAccount(a); renderAll();
+    });
+  });
+  const addMeetingBtn = document.getElementById("addMeetingBtn");
+  if (addMeetingBtn) addMeetingBtn.addEventListener("click", ()=>{
+    const date = document.getElementById("newMeetingDate").value || todayStr();
+    const notes = document.getElementById("newMeetingNotes").value.trim();
+    if (!notes) return;
+    const a = findAccount(selectedId);
+    a.meetings.push({ id:uid("meeting"), date, notes });
+    upsertAccount(a); renderAll();
+  });
+  document.querySelectorAll("[data-del-meeting]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const a = findAccount(selectedId);
+      a.meetings = a.meetings.filter(m=>m.id!==btn.dataset.delMeeting);
+      upsertAccount(a); renderAll();
+    });
+  });
+
+  // Scoring
+  const scName = document.getElementById("scName");
+  if (scName) scName.addEventListener("input", e=> scoringForm.name = e.target.value);
+  const scDomain = document.getElementById("scDomain");
+  if (scDomain) scDomain.addEventListener("change", e=> scoringForm.domain = e.target.value);
+  const criteriaPanel = document.getElementById("criteriaPanel");
+  if (criteriaPanel) criteriaPanel.addEventListener("click",(e)=>{
+    const btn = e.target.closest(".score-btn");
+    if (!btn) return;
+    scoringForm.scores[btn.dataset.key] = parseInt(btn.dataset.val,10);
+    renderAll();
+    // restore focus context: re-render replaces DOM, values persist via scoringForm
+  });
+  const saveScoreBtn = document.getElementById("saveScoreBtn");
+  if (saveScoreBtn) saveScoreBtn.addEventListener("click", ()=>{
+    if (!scoringForm.name.trim()){
+      const err = document.getElementById("scoreErr");
+      err.style.display="block"; err.textContent="Enter a company or account name first.";
+      return;
+    }
+    if (!scoringForm.id) scoringForm.id = uid("acc");
+    upsertAccount({ ...scoringForm });
+    selectedId = scoringForm.id;
+    view = "accounts";
+    scoringForm = emptyAccount();
+    renderAll();
+  });
+  const clearScoreBtn = document.getElementById("clearScoreBtn");
+  if (clearScoreBtn) clearScoreBtn.addEventListener("click", ()=>{ scoringForm = emptyAccount(); renderAll(); });
+}
+function bindAccField(elId, field){
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const evt = (el.tagName==="SELECT") ? "change" : "input";
+  el.addEventListener(evt, ()=>{
+    const a = findAccount(selectedId);
+    a[field] = el.value;
+    upsertAccount(a);
+  });
+}
+
+// ---------- Excel export ----------
+function downloadExcel(){
+  if (accounts.length===0){ alert("No accounts saved yet."); return; }
+  const rows = accounts.map(a=>{
+    const s = scoreOf(a.scores);
+    const stageLabel = STAGES.find(st=>st.value===a.stage).label;
+    const lastMeeting = [...a.meetings].sort((x,y)=> new Date(y.date)-new Date(x.date))[0];
+    const row = {
+      "Company / Account": a.name,
+      "Domain": a.domain,
+      "ICP Tier": s.tier.label,
+      "Weighted Score": Number(s.raw.toFixed(2)),
+      "Max Score": MAX_RAW,
+      "Percent of Max": Number(s.pct.toFixed(1)),
+      "Stage %": a.stage,
+      "Stage Label": stageLabel,
+      "Payment Received": a.stage===100 ? "Yes" : "No",
+      "Owner": a.owner||"",
+      "Next Action": a.nextAction||"",
+      "Contacts": a.contacts.map(c=>c.name+" ("+c.role+")").join("; "),
+      "Last Meeting Date": lastMeeting ? lastMeeting.date : "",
+      "Last Meeting Notes": lastMeeting ? lastMeeting.notes : "",
+      "Notes": a.notes||"",
+    };
+    CRITERIA.forEach(c=>{ row[c.label] = a.scores[c.key]; });
+    return row;
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Accounts");
+  XLSX.writeFile(wb, "fathom-crm-accounts.xlsx");
+}
+
+// ---------- Helpers ----------
+function esc(str){ return String(str==null?"":str).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+function escAttr(str){ return esc(str); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){ try { return new Date(d).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}); } catch(e){ return d; } }
+
+// ---------- Splash / access gate ----------
+// This is a deterrent, not real security: anyone who inspects the page source
+// or browser devtools can find this hash and the comparison logic. Don't rely
+// on it for anything genuinely sensitive. Change PASSPHRASE_HASH below (a
+// SHA-256 hex digest) if you want a different shared passphrase, and only
+// share the plain passphrase with people you actually authorize.
+const PASSPHRASE_HASH = "8d5c07e75b5fc60f337dec4025e9261e09920d02057985bb37e1ab8811fb55e3"; // "FathomPilot2026"
+const UNLOCK_KEY = "fathomCrmUnlocked";
+
+async function sha256Hex(text) {
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function showSplash(hasError) {
+  document.getElementById("splash").style.display = "flex";
+  document.getElementById("appRoot").classList.remove("visible");
+  const err = document.getElementById("passErr");
+  err.textContent = hasError ? "That passphrase isn't right \u2014 check with your team lead." : "";
+}
+function enterApp() {
+  document.getElementById("splash").style.display = "none";
+  document.getElementById("appRoot").classList.add("visible");
+}
+
+async function attemptEntry() {
+  const val = document.getElementById("passInput").value;
+  const nameVal = document.getElementById("nameInputSplash").value.trim();
+  const hash = await sha256Hex(val);
+  if (hash === PASSPHRASE_HASH) {
+    try {
+      localStorage.setItem(UNLOCK_KEY, "1");
+      if (nameVal) localStorage.setItem("fathomCrmUserName", nameVal);
+    } catch (e) {}
+    enterApp();
+    renderAll();
+  } else {
+    showSplash(true);
+  }
+}
+document.getElementById("enterBtn").addEventListener("click", attemptEntry);
+document.getElementById("passInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") attemptEntry();
+});
+// Skip the prompt on return visits from the same browser
+try {
+  if (localStorage.getItem(UNLOCK_KEY) === "1") enterApp();
+} catch (e) {}
+
+// ---------- PWA registration (safe no-op if unsupported, e.g. opened as a local file) ----------
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("service-worker.js").catch(()=>{ /* offline support is optional */ });
+  });
+}
+
+// ---------- First render ----------
+renderAll();
+</script>
+</body>
+</html>
